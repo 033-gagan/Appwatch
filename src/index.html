@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AppWatch</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & Variables ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d0f;
+  --bg2:       #141417;
+  --bg3:       #1c1c21;
+  --border:    #2a2a32;
+  --accent:    #e8ff47;
+  --accent2:   #ff6b35;
+  --accent3:   #47b8ff;
+  --text:      #f0f0f5;
+  --muted:     #6b6b7a;
+  --danger:    #ff4757;
+  --success:   #2ecc71;
+  --mono:      'Space Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+  --radius:    12px;
+  --radius-sm: 8px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+/* ── Title Bar ─────────────────────────────────────────────────── */
+#titlebar {
+  -webkit-app-region: drag;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 42px; padding: 0 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+}
+#titlebar .logo {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.08em; color: var(--accent);
+}
+#titlebar .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+.win-controls { -webkit-app-region: no-drag; display: flex; gap: 6px; }
+.win-btn {
+  width: 30px; height: 20px; border: none; cursor: pointer;
+  border-radius: 4px; font-size: 11px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg3); color: var(--muted); transition: all .15s;
+}
+.win-btn:hover { background: var(--border); color: var(--text); }
+.win-btn.close:hover { background: var(--danger); color: #fff; }
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#app { display: flex; height: 100vh; padding-top: 42px; }
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+#sidebar {
+  width: 220px; min-width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 12px 20px 12px;
+  gap: 4px;
+}
+.nav-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; margin: 12px 8px 4px; }
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  border: none; background: none; cursor: pointer;
+  color: var(--muted); font-family: var(--sans); font-size: 13.5px; font-weight: 500;
+  width: 100%; text-align: left; transition: all .15s;
+}
+.nav-btn:hover { background: var(--bg3); color: var(--text); }
+.nav-btn.active { background: rgba(232,255,71,.1); color: var(--accent); }
+.nav-btn .icon { font-size: 15px; width: 18px; text-align: center; }
+.sidebar-footer { margin-top: auto; padding: 12px 8px; }
+.sidebar-footer p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ── Main Content ──────────────────────────────────────────────── */
+#main { flex: 1; overflow-y: auto; padding: 32px 32px 28px 32px; }
+
+/* ── Views ─────────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Page Header ───────────────────────────────────────────────── */
+.page-header { margin-bottom: 28px; }
+.page-header h1 { font-family: var(--mono); font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.page-header p { font-size: 13.5px; color: var(--muted); margin-top: 4px; }
+
+/* ── Stats Row ─────────────────────────────────────────────────── */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-card.green::before { background: var(--success); }
+.stat-card.yellow::before { background: var(--accent); }
+.stat-card.blue::before { background: var(--accent3); }
+.stat-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.stat-value { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--text); }
+.stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* ── App List ──────────────────────────────────────────────────── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-title { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+
+.app-grid { display: flex; flex-direction: column; gap: 10px; }
+
+.app-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px;
+  display: flex; align-items: center; gap: 16px;
+  transition: all .2s; position: relative; overflow: hidden;
+}
+.app-card:hover { border-color: var(--border); background: var(--bg3); }
+.app-card.tracking { border-color: var(--accent); }
+.app-card.tracking::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(232,255,71,.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+.app-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+  background: var(--bg3);
+}
+.app-info { flex: 1; min-width: 0; }
+.app-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-category { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+.app-timer {
+  font-family: var(--mono); font-size: 18px; font-weight: 700;
+  color: var(--muted); letter-spacing: .04em; min-width: 90px; text-align: right;
+  transition: color .3s;
+}
+.app-card.tracking .app-timer { color: var(--accent); }
+
+.app-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Limit indicator */
+.limit-bar-wrap { width: 80px; }
+.limit-bar-label { font-size: 10px; color: var(--muted); text-align: right; margin-bottom: 3px; }
+.limit-bar { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.limit-bar-fill { height: 100%; border-radius: 2px; background: var(--success); transition: width .5s, background .3s; }
+.limit-bar-fill.warn { background: var(--accent); }
+.limit-bar-fill.danger { background: var(--danger); }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn {
+  padding: 7px 14px; border-radius: var(--radius-sm); border: none;
+  cursor: pointer; font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+  transition: all .15s; white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #0d0d0f; }
+.btn-primary:hover { background: #d4e83e; }
+.btn-danger { background: rgba(255,71,87,.15); color: var(--danger); border: 1px solid rgba(255,71,87,.3); }
+.btn-danger:hover { background: rgba(255,71,87,.25); }
+.btn-ghost { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+.btn-icon { padding: 7px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+.btn-start { background: rgba(232,255,71,.12); color: var(--accent); border: 1px solid rgba(232,255,71,.3); }
+.btn-start:hover { background: rgba(232,255,71,.22); }
+.btn-stop { background: rgba(255,71,87,.12); color: var(--danger); border: 1px solid rgba(255,71,87,.3); }
+.btn-stop:hover { background: rgba(255,71,87,.22); }
+
+/* ── Add App Modal ─────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px; width: 460px; max-width: 90vw;
+  transform: translateY(12px); transition: transform .2s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal h2 { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.modal p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.form-input, .form-select {
+  width: 100%; padding: 10px 14px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text); font-family: var(--sans); font-size: 14px;
+  outline: none; transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus { border-color: var(--accent); }
+.form-select option { background: var(--bg3); }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
+.emoji-opt {
+  padding: 6px; border-radius: 6px; background: var(--bg3);
+  border: 2px solid transparent; cursor: pointer; font-size: 18px;
+  text-align: center; transition: all .1s;
+}
+.emoji-opt:hover { border-color: var(--border); }
+.emoji-opt.selected { border-color: var(--accent); background: rgba(232,255,71,.1); }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+/* ── Limit Settings ────────────────────────────────────────────── */
+.limit-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; margin-bottom: 10px;
+}
+.limit-app-icon { font-size: 20px; }
+.limit-app-name { flex: 1; font-size: 14px; font-weight: 500; }
+.limit-input-wrap { display: flex; align-items: center; gap: 8px; }
+.limit-input {
+  width: 70px; padding: 6px 10px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: var(--mono); font-size: 13px;
+  text-align: center; outline: none;
+}
+.limit-input:focus { border-color: var(--accent); }
+.limit-unit { font-size: 12px; color: var(--muted); }
+.limit-toggle {
+  width: 38px; height: 20px; border-radius: 10px; background: var(--bg3);
+  border: 1px solid var(--border); cursor: pointer; position: relative;
+  transition: background .2s;
+}
+.limit-toggle.on { background: var(--accent); border-color: var(--accent); }
+.limit-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%; background: var(--muted);
+  transition: transform .2s, background .2s;
+}
+.limit-toggle.on::after { transform: translateX(18px); background: #0d0d0f; }
+
+/* ── Charts View ───────────────────────────────────────────────── */
+.chart-container { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+.chart-title { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+
+/* Bar chart */
+.bar-chart { display: flex; align-items: flex-end; gap: 10px; height: 160px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; background: var(--accent); opacity: .7; transition: opacity .15s, height .4s; cursor: pointer; position: relative; }
+.bar:hover { opacity: 1; }
+.bar-tooltip {
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-family: var(--mono); font-size: 11px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.bar:hover .bar-tooltip { opacity: 1; }
+.bar-label { font-size: 10px; color: var(--muted); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Donut chart */
+.donut-wrap { display: flex; align-items: center; gap: 28px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { display: flex; flex-direction: column; gap: 10px; }
+.legend-item { display: flex; align-items: center; gap: 10px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { font-size: 13px; color: var(--text); }
+.legend-val { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: auto; padding-left: 16px; }
+
+/* History list */
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--bg3); border-radius: var(--radius-sm);
+}
+.history-icon { font-size: 16px; }
+.history-name { flex: 1; font-size: 13px; font-weight: 500; }
+.history-date { font-size: 11px; color: var(--muted); }
+.history-time { font-family: var(--mono); font-size: 13px; color: var(--accent3); }
+.empty-state { text-align: center; padding: 48px 0; color: var(--muted); font-size: 14px; }
+.empty-state .big { font-size: 40px; margin-bottom: 12px; }
+
+/* ── Notification toast ─────────────────────────────────────────── */
+.toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px; min-width: 260px;
+  display: flex; align-items: center; gap: 10px;
+  animation: slideIn .25s ease; font-size: 13px;
+}
+.toast.alert { border-color: var(--danger); }
+@keyframes slideIn { from { transform: translateX(20px); opacity:0 } to { transform:translateX(0); opacity:1 } }
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Title Bar -->
+<div id="titlebar">
+  <div class="logo">
+    <div class="dot"></div>
+    APPWATCH
+  </div>
+  <div class="win-controls">
+    <button class="win-btn" onclick="ipcRenderer.send('window-minimize')">─</button>
+    <button class="win-btn" onclick="ipcRenderer.send('window-maximize')">□</button>
+    <button class="win-btn close" onclick="ipcRenderer.send('window-close')">✕</button>
+  </div>
+</div>
+
+<!-- App Layout -->
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="nav-label">Monitor</div>
+    <button class="nav-btn active" onclick="showView('dashboard', this)">
+      <span class="icon">⏱</span> Dashboard
+    </button>
+    <button class="nav-btn" onclick="showView('charts', this)">
+      <span class="icon">📊</span> Analytics
+    </button>
+    <div class="nav-label">Settings</div>
+    <button class="nav-btn" onclick="showView('limits', this)">
+      <span class="icon">⚠️</span> Limits
+    </button>
+    <button class="nav-btn" onclick="showView('settings', this)">
+      <span class="icon">⚙️</span> Settings
+    </button>
+    <div class="sidebar-footer">
+      <p>AppWatch v1.0<br/>Tracking your screen time</p>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main id="main">
+
+    <!-- ── Dashboard ────────────────────────────────────────────── -->
+    <div id="view-dashboard" class="view active">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Select an app and start tracking your usage time</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="stat-label">Apps Tracked Today</div>
+          <div class="stat-value" id="stat-apps">0</div>
+          <div class="stat-sub">of <span id="stat-total">0</span> added</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-label">Total Time Today</div>
+          <div class="stat-value" id="stat-total-time">0h 0m</div>
+          <div class="stat-sub">across all apps</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Currently Tracking</div>
+          <div class="stat-value" id="stat-active">—</div>
+          <div class="stat-sub" id="stat-active-sub">no app running</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Your Apps</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" id="float-toggle-btn" onclick="toggleFloat()">◈ Float: OFF</button>
+          <button class="btn btn-primary" onclick="openAddModal()">+ Add App</button>
+        </div>
+      </div>
+
+      <div class="app-grid" id="app-grid">
+        <div class="empty-state">
+          <div class="big">📦</div>
+          <p>No apps added yet.<br/>Click <strong>+ Add App</strong> to start tracking.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Charts ────────────────────────────────────────────────── -->
+    <div id="view-charts" class="view">
+      <div class="page-header">
+        <h1>Analytics</h1>
+        <p>Usage breakdown and history</p>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Today's usage by app (hours)</div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="chart-container">
+          <div class="chart-title">Time distribution</div>
+          <div class="donut-wrap">
+            <svg class="donut-svg" width="120" height="120" viewBox="0 0 120 120" id="donut-svg">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="#1c1c21" stroke-width="18"/>
+              <text x="60" y="65" text-anchor="middle" fill="#6b6b7a" font-size="11" font-family="Space Mono">no data</text>
+            </svg>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Recent sessions</div>
+          <div class="history-list" id="history-list">
+            <div class="empty-state"><p>No sessions recorded yet.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Limits ─────────────────────────────────────────────────── -->
+    <div id="view-limits" class="view">
+      <div class="page-header">
+        <h1>Daily Limits</h1>
+        <p>Set time limits per app — get notified when you exceed them</p>
+      </div>
+      <div id="limits-list">
+        <div class="empty-state"><div class="big">⚙️</div><p>Add apps on the Dashboard first.</p></div>
+      </div>
+    </div>
+
+    <!-- ── Settings ──────────────────────────────────────────────── -->
+    <div id="view-settings" class="view">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <p>App preferences and behaviour</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:560px;">
+
+        <!-- Auto-launch -->
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Launch at Windows startup</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">AppWatch starts automatically when you log in</div>
+          </div>
+          <button class="limit-toggle" id="autolaunch-toggle" onclick="toggleAutoLaunch()"></button>
+        </div>
+
+        <!-- Float widget -->
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Floating timer widget</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Show live timer on top of all windows when tracking</div>
+          </div>
+          <button class="limit-toggle" id="float-setting-toggle" onclick="toggleFloat()"></button>
+        </div>
+
+        <!-- Data location -->
+        <div class="limit-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Data file location</div>
+          <div style="font-size:12px;color:var(--muted);font-family:var(--mono);background:var(--bg3);padding:8px 12px;border-radius:6px;width:100%;">
+            %APPDATA%\appwatch\appwatch-data.json
+          </div>
+          <div style="font-size:12px;color:var(--muted);">Your usage history is stored here. Back it up to keep your data safe.</div>
+        </div>
+
+        <!-- Reset today -->
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Reset all timers for today</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Clears today's usage — history is kept</div>
+          </div>
+          <button class="btn btn-danger" onclick="resetAllToday()">Reset Today</button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Add App Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h2>Add App to Track</h2>
+    <p>Give it a name, pick an icon and category.</p>
+
+    <div class="form-group">
+      <label class="form-label">App Name</label>
+      <input class="form-input" id="new-app-name" placeholder="e.g. YouTube, VS Code, Figma…" maxlength="40" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-select" id="new-app-cat">
+        <option value="Work">💼 Work</option>
+        <option value="Entertainment">🎬 Entertainment</option>
+        <option value="Social">💬 Social</option>
+        <option value="Gaming">🎮 Gaming</option>
+        <option value="Learning">📚 Learning</option>
+        <option value="Health">🏃 Health</option>
+        <option value="Finance">💰 Finance</option>
+        <option value="Other">📦 Other</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Pick an Icon</label>
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addApp()">Add App</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+// ── State ──────────────────────────────────────────────────────────────────
+let state = { apps: [], history: [], limits: {} };
+let activeAppId = null;
+let floatEnabled = false;
+let selectedEmoji = '📦';
+
+const EMOJIS = ['💻','🌐','📺','🎮','📱','💬','📷','🎵','📚','✍️','🎨','📊','📂','⚙️','🔧','🏃','🍕','☕','🎯','🚀','💰','🔔','📧','🗂','🎬','🎧','🛠','🌍','🔒','📝'];
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  state = await ipcRenderer.invoke('load-data');
+  if (!state.apps) state.apps = [];
+  if (!state.history) state.history = [];
+  if (!state.limits) state.limits = {};
+
+  // Restore active timer state from main process
+  const timerState = await ipcRenderer.invoke('get-timer-state');
+  if (timerState.activeAppId) {
+    activeAppId = timerState.activeAppId;
+    // Sync seconds from main
+    const app = state.apps.find(a => a.id === activeAppId);
+    if (app) app.todaySeconds = timerState.activeSeconds;
+  }
+  floatEnabled = timerState.floatEnabled;
+  const floatBtn = document.getElementById('float-toggle-btn');
+  if (floatBtn && floatEnabled) {
+    floatBtn.textContent = '◈ Float: ON';
+    floatBtn.style.color = 'var(--accent)';
+    floatBtn.style.borderColor = 'rgba(232,255,71,0.4)';
+  }
+
+  renderAll();
+}
+
+// ── Views ──────────────────────────────────────────────────────────────────
+function showView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'charts') renderCharts();
+  if (name === 'limits') renderLimits();
+}
+
+// ── Render All ─────────────────────────────────────────────────────────────
+function renderAll() {
+  renderApps();
+  renderStats();
+}
+
+function renderStats() {
+  const tracked = state.apps.filter(a => a.todaySeconds > 0).length;
+  document.getElementById('stat-apps').textContent = tracked;
+  document.getElementById('stat-total').textContent = state.apps.length;
+
+  const total = state.apps.reduce((s, a) => s + (a.todaySeconds || 0), 0);
+  document.getElementById('stat-total-time').textContent = formatHM(total);
+
+  if (activeAppId) {
+    const app = state.apps.find(a => a.id === activeAppId);
+    if (app) {
+      document.getElementById('stat-active').textContent = app.icon;
+      document.getElementById('stat-active-sub').textContent = app.name;
+    }
+  } else {
+    document.getElementById('stat-active').textContent = '—';
+    document.getElementById('stat-active-sub').textContent = 'no app running';
+  }
+}
+
+// ── App Cards ──────────────────────────────────────────────────────────────
+function renderApps() {
+  const grid = document.getElementById('app-grid');
+  if (!state.apps.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="big">📦</div><p>No apps added yet.<br/>Click <strong>+ Add App</strong> to start tracking.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = state.apps.map(app => {
+    const isTracking = app.id === activeAppId;
+    const limit = state.limits[app.id];
+    const limitEnabled = limit && limit.enabled;
+    const pct = limitEnabled ? Math.min(100, ((app.todaySeconds || 0) / (limit.minutes * 60)) * 100) : 0;
+    const barClass = pct >= 100 ? 'danger' : pct >= 80 ? 'warn' : '';
+
+    return `
+    <div class="app-card ${isTracking ? 'tracking' : ''}" id="card-${app.id}">
+      <div class="app-icon">${app.icon}</div>
+      <div class="app-info">
+        <div class="app-name">${app.name}</div>
+        <div class="app-category">${app.category}</div>
+      </div>
+      ${limitEnabled ? `
+        <div class="limit-bar-wrap">
+          <div class="limit-bar-label">${Math.round(pct)}% of ${limit.minutes}m</div>
+          <div class="limit-bar"><div class="limit-bar-fill ${barClass}" style="width:${pct}%"></div></div>
+        </div>` : ''}
+      <div class="app-timer" id="timer-${app.id}">${formatTime(app.todaySeconds || 0)}</div>
+      <div class="app-actions">
+        ${isTracking
+          ? `<button class="btn btn-stop" onclick="stopTracking()">⏹ Stop</button>`
+          : `<button class="btn btn-start" onclick="startTracking('${app.id}')">▶ Start</button>`
+        }
+        <button class="btn btn-ghost btn-icon" title="Reset today" onclick="resetApp('${app.id}')">↺</button>
+        <button class="btn btn-danger btn-icon" title="Remove" onclick="removeApp('${app.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Float Widget ───────────────────────────────────────────────────────────
+
+function toggleFloat() {
+  floatEnabled = !floatEnabled;
+  const btn = document.getElementById('float-toggle-btn');
+  const settingBtn = document.getElementById('float-setting-toggle');
+  if (btn) { btn.textContent = floatEnabled ? '◈ Float: ON' : '◈ Float: OFF'; btn.style.color = floatEnabled ? 'var(--accent)' : ''; btn.style.borderColor = floatEnabled ? 'rgba(232,255,71,0.4)' : ''; }
+  if (settingBtn) settingBtn.classList.toggle('on', floatEnabled);
+  ipcRenderer.send('float-toggle', floatEnabled);
+}
+
+// Stop from float widget button
+ipcRenderer.on('stop-tracking-from-float', () => stopTracking());
+
+ipcRenderer.on('float-hidden', () => {
+  floatEnabled = false;
+  const btn = document.getElementById('float-toggle-btn');
+  const settingBtn = document.getElementById('float-setting-toggle');
+  if (btn) {
+    btn.textContent = '◈ Float: OFF';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+  if (settingBtn) settingBtn.classList.remove('on');
+});
+
+// ── Receive ticks FROM main process (single source of truth) ───────────────
+ipcRenderer.on('timer-tick', (_, { appId, seconds }) => {
+  // Update in-memory state
+  const app = state.apps.find(a => a.id === appId);
+  if (app) app.todaySeconds = seconds;
+
+  // Update timer display
+  const timerEl = document.getElementById('timer-' + appId);
+  if (timerEl) timerEl.textContent = formatTime(seconds);
+
+  // Update stats row
+  renderStats();
+
+  // Update limit bar every 5s
+  if (seconds % 5 === 0 && app) updateLimitBar(app);
+});
+
+// Main process says tracking stopped
+ipcRenderer.on('timer-stopped', (_, { appId }) => {
+  activeAppId = null;
+  // Reload data from disk to get accurate saved state
+  ipcRenderer.invoke('load-data').then(fresh => {
+    state = fresh;
+    renderAll();
+  });
+});
+
+// Main process fired a limit alert
+ipcRenderer.on('limit-alert', (_, { name, minutes }) => {
+  showToast(`Limit reached for ${name} (${minutes} min)`, true);
+});
+
+// ── Timer Logic ────────────────────────────────────────────────────────────
+function startTracking(appId) {
+  if (activeAppId === appId) return;
+
+  const app = state.apps.find(a => a.id === appId);
+  if (!app) return;
+
+  activeAppId = appId;
+
+  // Tell main process to start the timer
+  ipcRenderer.send('start-tracking', {
+    appId,
+    currentSeconds: app.todaySeconds || 0,
+    icon: app.icon,
+    name: app.name
+  });
+
+  renderApps();
+  showToast(`Started tracking ${app.name}`, false);
+}
+
+async function stopTracking() {
+  if (!activeAppId) return;
+  const app = state.apps.find(a => a.id === activeAppId);
+  const name = app?.name;
+
+  // Stop in main process and then sync from disk to avoid write races
+  const fresh = await ipcRenderer.invoke('stop-tracking');
+  if (fresh) state = fresh;
+  activeAppId = null;
+
+  renderApps();
+  renderStats();
+  if (document.getElementById('view-charts').classList.contains('active')) renderCharts();
+  if (name) showToast(`Stopped tracking ${name}`, false);
+}
+
+function triggerLimitAlert(app) {
+  showToast(`Limit reached for ${app.name}`, true);
+}
+
+function updateLimitBar(app) {
+  const limit = state.limits[app.id];
+  if (!limit || !limit.enabled) return;
+  const pct = Math.min(100, ((app.todaySeconds || 0) / (limit.minutes * 60)) * 100);
+  const fill = document.querySelector(`#card-${app.id} .limit-bar-fill`);
+  const label = document.querySelector(`#card-${app.id} .limit-bar-label`);
+  if (fill) {
+    fill.style.width = pct + '%';
+    fill.className = `limit-bar-fill${pct >= 100 ? ' danger' : pct >= 80 ? ' warn' : ''}`;
+  }
+  if (label) label.textContent = `${Math.round(pct)}% of ${limit.minutes}m`;
+}
+
+// ── App CRUD ───────────────────────────────────────────────────────────────
+function addApp() {
+  const name = document.getElementById('new-app-name').value.trim();
+  if (!name) { document.getElementById('new-app-name').focus(); return; }
+
+  const cat = document.getElementById('new-app-cat').value;
+  const app = {
+    id: 'app_' + Date.now(),
+    name, icon: selectedEmoji, category: cat,
+    todaySeconds: 0, createdAt: Date.now()
+  };
+  state.apps.push(app);
+  saveState();
+  renderAll();
+  closeAddModal();
+  showToast(`✅ Added ${name}`, false);
+}
+
+async function removeApp(appId) {
+  const app = state.apps.find(a => a.id === appId);
+  const name = app?.name;
+
+  const fresh = await ipcRenderer.invoke('remove-app', appId);
+  if (fresh) state = fresh;
+  if (activeAppId === appId) activeAppId = null;
+
+  renderAll();
+  if (document.getElementById('view-charts').classList.contains('active')) renderCharts();
+  if (name) showToast(`Removed ${name}`, false);
+}
+
+async function resetApp(appId) {
+  const app = state.apps.find(a => a.id === appId);
+  if (!app) return;
+  const fresh = await ipcRenderer.invoke('reset-app-time', appId);
+  if (fresh) state = fresh;
+  if (activeAppId === appId) activeAppId = null;
+  renderAll();
+  showToast(`↺ Reset ${app.name}`, false);
+}
+
+// ── Limits ─────────────────────────────────────────────────────────────────
+function renderLimits() {
+  const el = document.getElementById('limits-list');
+  if (!state.apps.length) {
+    el.innerHTML = `<div class="empty-state"><div class="big">⚙️</div><p>Add apps on the Dashboard first.</p></div>`;
+    return;
+  }
+  el.innerHTML = state.apps.map(app => {
+    const lim = state.limits[app.id] || { enabled: false, minutes: 60 };
+    return `
+    <div class="limit-row">
+      <div class="limit-app-icon">${app.icon}</div>
+      <div class="limit-app-name">${app.name}</div>
+      <div class="limit-input-wrap">
+        <input class="limit-input" type="number" min="1" max="1440" value="${lim.minutes}"
+          onchange="updateLimit('${app.id}','minutes',this.value)" />
+        <span class="limit-unit">min / day</span>
+        <button class="limit-toggle ${lim.enabled ? 'on' : ''}" id="ltog-${app.id}"
+          onclick="toggleLimit('${app.id}')"></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateLimit(appId, key, val) {
+  if (!state.limits[appId]) state.limits[appId] = { enabled: false, minutes: 60 };
+  state.limits[appId][key] = key === 'minutes' ? parseInt(val) || 60 : val;
+  saveState();
+}
+
+function toggleLimit(appId) {
+  if (!state.limits[appId]) state.limits[appId] = { enabled: false, minutes: 60 };
+  state.limits[appId].enabled = !state.limits[appId].enabled;
+  saveState();
+  const btn = document.getElementById('ltog-' + appId);
+  if (btn) btn.classList.toggle('on', state.limits[appId].enabled);
+  renderApps();
+}
+
+// ── Charts ─────────────────────────────────────────────────────────────────
+const PALETTE = ['#e8ff47','#47b8ff','#ff6b35','#2ecc71','#a855f7','#f59e0b','#ec4899','#06b6d4'];
+
+function renderCharts() {
+  renderBarChart();
+  renderDonut();
+  renderHistory();
+}
+
+function renderBarChart() {
+  const el = document.getElementById('bar-chart');
+  const apps = state.apps.filter(a => a.todaySeconds > 0);
+  if (!apps.length) { el.innerHTML = '<div class="empty-state" style="width:100%;align-self:center"><p>No usage recorded today.</p></div>'; return; }
+
+  const max = Math.max(...apps.map(a => a.todaySeconds));
+  el.innerHTML = apps.map((app, i) => {
+    const h = max > 0 ? Math.max(8, (app.todaySeconds / max) * 140) : 8;
+    return `
+    <div class="bar-wrap">
+      <div class="bar" style="height:${h}px;background:${PALETTE[i % PALETTE.length]}">
+        <div class="bar-tooltip">${formatTime(app.todaySeconds)}</div>
+      </div>
+      <div class="bar-label" title="${app.name}">${app.icon} ${app.name.slice(0,8)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDonut() {
+  const svg = document.getElementById('donut-svg');
+  const legend = document.getElementById('donut-legend');
+  const apps = state.apps.filter(a => a.todaySeconds > 0);
+  if (!apps.length) {
+    svg.innerHTML = `<circle cx="60" cy="60" r="48" fill="none" stroke="#1c1c21" stroke-width="18"/><text x="60" y="65" text-anchor="middle" fill="#6b6b7a" font-size="11" font-family="Space Mono">no data</text>`;
+    legend.innerHTML = '';
+    return;
+  }
+
+  const total = apps.reduce((s, a) => s + a.todaySeconds, 0);
+  const r = 48; const cx = 60; const cy = 60;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  let circles = '';
+  apps.forEach((app, i) => {
+    const frac = app.todaySeconds / total;
+    const dash = frac * circ;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PALETTE[i%PALETTE.length]}" stroke-width="18" stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += dash;
+  });
+  svg.innerHTML = circles;
+  legend.innerHTML = apps.map((app, i) =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${PALETTE[i%PALETTE.length]}"></div><span class="legend-name">${app.icon} ${app.name}</span><span class="legend-val">${formatHM(app.todaySeconds)}</span></div>`
+  ).join('');
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  const recent = state.history.slice(0, 15);
+  if (!recent.length) { el.innerHTML = '<div class="empty-state"><p>No sessions recorded yet.</p></div>'; return; }
+  el.innerHTML = recent.map(h =>
+    `<div class="history-row">
+      <div class="history-icon">${h.appIcon}</div>
+      <div class="history-name">${h.appName}</div>
+      <div class="history-date">${h.date}</div>
+      <div class="history-time">${formatTime(h.seconds)}</div>
+    </div>`
+  ).join('');
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openAddModal() {
+  const grid = document.getElementById('emoji-grid');
+  grid.innerHTML = EMOJIS.map(e => `<div class="emoji-opt ${e===selectedEmoji?'selected':''}" onclick="selectEmoji('${e}',this)">${e}</div>`).join('');
+  document.getElementById('new-app-name').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(() => document.getElementById('new-app-name').focus(), 100);
+}
+function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); }
+function selectEmoji(e, el) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, isAlert) {
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${isAlert ? 'alert' : ''}`;
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function formatTime(secs) {
+  secs = secs || 0;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
+function formatHM(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+function saveState() { ipcRenderer.invoke('save-data', state); }
+
+// Close modal on overlay click
+document.getElementById('add-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAddModal();
+});
+
+// ── Settings ───────────────────────────────────────────────────────────────
+async function initSettings() {
+  const enabled = await ipcRenderer.invoke('get-auto-launch');
+  const btn = document.getElementById('autolaunch-toggle');
+  if (btn) btn.classList.toggle('on', !!enabled);
+}
+
+async function toggleAutoLaunch() {
+  const btn = document.getElementById('autolaunch-toggle');
+  const current = btn.classList.contains('on');
+  const result = await ipcRenderer.invoke('set-auto-launch', !current);
+  btn.classList.toggle('on', !!result);
+  showToast(result ? '✅ AppWatch will launch at startup' : '✅ Startup launch disabled', false);
+}
+
+async function resetAllToday() {
+  const fresh = await ipcRenderer.invoke('reset-all-times');
+  if (fresh) state = fresh;
+  activeAppId = null;
+  renderAll();
+  showToast('↺ All timers reset for today', false);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+init();
+initSettings();
+</script>
+</body>
+</html>
