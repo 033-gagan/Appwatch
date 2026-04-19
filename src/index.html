@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AppWatch</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./renderer/app.css" />
+</head>
+<body>
+
+<!-- Title Bar -->
+<div id="titlebar">
+  <div class="logo">
+    <div class="dot"></div>
+    APPWATCH
+  </div>
+  <div class="win-controls">
+    <button class="win-btn" onclick="ipcRenderer.send('window-minimize')">─</button>
+    <button class="win-btn" onclick="ipcRenderer.send('window-maximize')">□</button>
+    <button class="win-btn close" onclick="ipcRenderer.send('window-close')">✕</button>
+  </div>
+</div>
+
+<!-- App Layout -->
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="nav-label">Monitor</div>
+    <button class="nav-btn active" onclick="showView('dashboard', this)">
+      <span class="icon">⏱</span> Dashboard
+    </button>
+    <button class="nav-btn" onclick="showView('charts', this)">
+      <span class="icon">📊</span> Analytics
+    </button>
+    <button class="nav-btn" onclick="showView('daily', this)">
+      <span class="icon">📅</span> Daily History
+    </button>
+    <div class="nav-label">Settings</div>
+    <button class="nav-btn" onclick="showView('limits', this)">
+      <span class="icon">⚠️</span> Limits
+    </button>
+    <button class="nav-btn" onclick="showView('settings', this)">
+      <span class="icon">⚙️</span> Settings
+    </button>
+    <div class="sidebar-footer">
+      <p>AppWatch v1.0<br/>Tracking your screen time</p>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main id="main">
+
+    <div id="view-dashboard" class="view active">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Select an app and start tracking your usage time</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="stat-label">Apps Tracked Today</div>
+          <div class="stat-value" id="stat-apps">0</div>
+          <div class="stat-sub">of <span id="stat-total">0</span> added</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-label">Total Time Today</div>
+          <div class="stat-value" id="stat-total-time">0h 0m</div>
+          <div class="stat-sub">across all apps</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Currently Tracking</div>
+          <div class="stat-value" id="stat-active">—</div>
+          <div class="stat-sub" id="stat-active-sub">no app running</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Your Apps</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" id="float-toggle-btn" onclick="toggleFloat()">◈ Float: OFF</button>
+          <button class="btn btn-primary" onclick="openAddModal()">+ Add App</button>
+        </div>
+      </div>
+
+      <div class="app-grid" id="app-grid">
+        <div class="empty-state">
+          <div class="big">📦</div>
+          <p>No apps added yet.<br/>Click <strong>+ Add App</strong> to start tracking.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-charts" class="view">
+      <div class="page-header">
+        <h1>Analytics</h1>
+        <p>Usage breakdown and history</p>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Today's usage by app (hours)</div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="chart-container">
+          <div class="chart-title">Time distribution</div>
+          <div class="donut-wrap">
+            <svg class="donut-svg" width="120" height="120" viewBox="0 0 120 120" id="donut-svg">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="#1c1c21" stroke-width="18"/>
+              <text x="60" y="65" text-anchor="middle" fill="#6b6b7a" font-size="11" font-family="Space Mono">no data</text>
+            </svg>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Recent sessions</div>
+          <div class="history-list" id="history-list">
+            <div class="empty-state"><p>No sessions recorded yet.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-daily" class="view">
+      <div class="page-header">
+        <h1>Daily History</h1>
+        <p>Total time spent per app, grouped by date</p>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <select class="form-select" id="daily-date-filter" style="max-width:220px;" onchange="renderDailyView()">
+          <option value="all">All dates</option>
+        </select>
+        <select class="form-select" id="daily-app-filter" style="max-width:200px;" onchange="renderDailyView()">
+          <option value="all">All apps</option>
+        </select>
+        <button class="btn btn-ghost" onclick="saveTodaySnapshot()" title="Save today's data now without waiting for midnight">💾 Save Today</button>
+      </div>
+
+      <div id="daily-content">
+        <div class="empty-state"><div class="big">📅</div><p>No daily data yet.<br/>Data saves automatically at midnight or click Save Today.</p></div>
+      </div>
+    </div>
+
+    <div id="view-limits" class="view">
+      <div class="page-header">
+        <h1>Daily Limits</h1>
+        <p>Set time limits per app — get notified when you exceed them</p>
+      </div>
+      <div id="limits-list">
+        <div class="empty-state"><div class="big">⚙️</div><p>Add apps on the Dashboard first.</p></div>
+      </div>
+    </div>
+
+    <div id="view-settings" class="view">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <p>App preferences and behaviour</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:560px;">
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Launch at Windows startup</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">AppWatch starts automatically when you log in</div>
+          </div>
+          <button class="limit-toggle" id="autolaunch-toggle" onclick="toggleAutoLaunch()"></button>
+        </div>
+
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Floating timer widget</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Show live timer on top of all windows when tracking</div>
+          </div>
+          <button class="limit-toggle" id="float-setting-toggle" onclick="toggleFloat()"></button>
+        </div>
+
+        <div class="limit-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Data file location</div>
+          <div style="font-size:12px;color:var(--muted);font-family:var(--mono);background:var(--bg3);padding:8px 12px;border-radius:6px;width:100%;">
+            %APPDATA%\appwatch\appwatch-data.json
+          </div>
+          <div style="font-size:12px;color:var(--muted);">Your usage history is stored here. Back it up to keep your data safe.</div>
+        </div>
+
+        <div class="limit-row" style="justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Reset all timers for today</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">Clears today's usage — history is kept</div>
+          </div>
+          <button class="btn btn-danger" onclick="resetAllToday()">Reset Today</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h2>Add App to Track</h2>
+    <p>Give it a name, pick an icon and category.</p>
+
+    <div class="form-group">
+      <label class="form-label">App Name</label>
+      <input class="form-input" id="new-app-name" placeholder="e.g. YouTube, VS Code, Figma…" maxlength="40" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-select" id="new-app-cat">
+        <option value="Work">💼 Work</option>
+        <option value="Entertainment">🎬 Entertainment</option>
+        <option value="Social">💬 Social</option>
+        <option value="Gaming">🎮 Gaming</option>
+        <option value="Learning">📚 Learning</option>
+        <option value="Health">🏃 Health</option>
+        <option value="Finance">💰 Finance</option>
+        <option value="Other">📦 Other</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Pick an Icon</label>
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addApp()">Add App</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script src="./renderer/app.js"></script>
+</body>
+</html>
